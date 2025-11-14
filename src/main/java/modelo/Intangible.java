@@ -9,5 +9,16 @@ package modelo;
  * @author monic
  */
 public class Intangible {
-    
+    String idIntangible;
+    String version;
+    String nombre_intangible;
+    String nombre_proveedor;
+    String tipoLicencia;
+    String codigo;
+    double costo;
+    String vidaUtil;
+    String estado;
+    String fechaAdquisicion;
+    String fechaVencimiento;
+
 }

@@ -9,5 +9,8 @@ package modelo;
  * @author monic
  */
 public class Proveedor {
+    String idProveedor;
+    String nombreProveedor;
+    
     
 }

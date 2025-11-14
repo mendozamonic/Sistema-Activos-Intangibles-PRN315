@@ -9,5 +9,6 @@ package modelo;
  * @author monic
  */
 public class Reporte {
+    String idReporte;
     
 }

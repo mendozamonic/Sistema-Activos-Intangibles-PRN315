@@ -9,5 +9,10 @@ package modelo;
  * @author monic
  */
 public class DetalleAmortizacion {
-    
+    String idDetalle;
+    int numero_cuota;
+    double monto;
+    double amortizacionMensual;
+    double amortizacionAnual;
+    String fechaCuota;
 }

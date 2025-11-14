@@ -9,5 +9,6 @@ package modelo;
  * @author monic
  */
 public class Usuario {
-    
+    String idUsuario;
+    String contrasena;
 }
