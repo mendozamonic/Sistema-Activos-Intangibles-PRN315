@@ -7,6 +7,7 @@ import modelo.Usuario;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 /**
  *
  * @author lulic
@@ -14,6 +15,8 @@ import java.sql.ResultSet;
 public class UsuarioDAO {
     
 
+
+    
     private static final String SQL_VALIDAR = 
         "SELECT idusuario, contrasena, nombre_completo FROM usuario WHERE idusuario = ? AND contrasena = ?";
     
@@ -43,6 +46,10 @@ public class UsuarioDAO {
                 usuarioValidado.setContrasena(rs.getString("contrasena"));
                 usuarioValidado.setNombreCompleto(rs.getString("nombre_completo")); 
             }
+        } catch (SQLException e) {
+            System.err.println("Error SQL en validar: " + e.getMessage());
+            System.err.println("SQL State: " + e.getSQLState());
+            e.printStackTrace();
         } catch (Exception e) {
             System.err.println("Error en validar: " + e.getMessage());
             e.printStackTrace();
@@ -69,7 +76,6 @@ public class UsuarioDAO {
             conn = Conexion.getConnection();
             System.out.println("Conexión establecida correctamente");
             
-            
             stmt = conn.prepareStatement(SQL_INSERTAR);
             stmt.setString(1, usuario.getIdUsuario());        
             stmt.setString(2, usuario.getContrasena());      
@@ -85,6 +91,24 @@ public class UsuarioDAO {
             System.out.println("Filas afectadas: " + filasAfectadas);
             System.out.println("Usuario insertado: " + (exito ? "ÉXITO" : "FALLÓ"));
             
+        } catch (SQLException e) {
+            System.err.println("=== ERROR SQL AL INSERTAR USUARIO ===");
+            System.err.println("SQL State: " + e.getSQLState());
+            System.err.println("Error Code: " + e.getErrorCode());
+            System.err.println("Mensaje: " + e.getMessage());
+            
+            // Check for specific constraint violations
+            if (e.getSQLState() != null && e.getSQLState().startsWith("23")) {
+                // Constraint violation (23xxx)
+                if (e.getMessage().contains("nombre_completo") || e.getMessage().contains("value too long")) {
+                    System.err.println("ERROR: El nombre completo excede el límite de caracteres permitidos.");
+                } else if (e.getMessage().contains("idusuario") || e.getMessage().contains("duplicate") || 
+                          e.getMessage().contains("unique")) {
+                    System.err.println("ERROR: El usuario ya existe en la base de datos.");
+                }
+            }
+            
+            e.printStackTrace();
         } catch (Exception e) {
             System.err.println("=== ERROR AL INSERTAR USUARIO ===");
             System.err.println("Mensaje: " + e.getMessage());
@@ -120,6 +144,10 @@ public class UsuarioDAO {
                 usuario.setContrasena(rs.getString("contrasena"));
                 usuario.setNombreCompleto(rs.getString("nombre_completo")); 
             }
+        } catch (SQLException e) {
+            System.err.println("Error SQL en buscarPorId: " + e.getMessage());
+            System.err.println("SQL State: " + e.getSQLState());
+            e.printStackTrace();
         } catch (Exception e) {
             System.err.println("Error en buscarPorId: " + e.getMessage());
             e.printStackTrace();
@@ -132,4 +160,3 @@ public class UsuarioDAO {
         return usuario;
     }
 }
-

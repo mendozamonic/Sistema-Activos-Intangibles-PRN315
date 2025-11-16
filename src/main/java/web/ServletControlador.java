@@ -69,9 +69,15 @@ public class ServletControlador extends HttpServlet {
         boolean loggedIn = (session != null && session.getAttribute("usuario") != null);
         
         if (loggedIn) {
-            request.getRequestDispatcher("/Usuario.jsp").forward(request, response);
+            // Try different possible paths for the menu
+            try {
+                request.getRequestDispatcher("/Usuario.jsp").forward(request, response);
+            } catch (Exception e) {
+                // If that fails, try paginas folder
+                request.getRequestDispatcher("/paginas/Usuario.jsp").forward(request, response);
+            }
         } else {
-            request.getRequestDispatcher("/paginas/login.jsp").forward(request, response);
+            response.sendRedirect(request.getContextPath() + "/paginas/login.jsp");
         }
     }
 
@@ -81,7 +87,16 @@ public class ServletControlador extends HttpServlet {
         String idUsuario = request.getParameter("idUsuario");
         String contrasena = request.getParameter("contrasena");
         
-        Usuario usuarioLogin = new Usuario(idUsuario, contrasena);
+        // Validate that fields are not empty
+        if (idUsuario == null || idUsuario.trim().isEmpty() ||
+            contrasena == null || contrasena.trim().isEmpty()) {
+            HttpSession session = request.getSession();
+            session.setAttribute("mensajeError", "Por favor, complete todos los campos.");
+            response.sendRedirect(request.getContextPath() + "/paginas/login.jsp");
+            return;
+        }
+        
+        Usuario usuarioLogin = new Usuario(idUsuario.trim(), contrasena);
         UsuarioDAO usuarioDao = new UsuarioDAO();
         Usuario usuarioValidado = usuarioDao.validar(usuarioLogin);
         
@@ -92,17 +107,18 @@ public class ServletControlador extends HttpServlet {
             session.removeAttribute("mensajeError"); 
             session.removeAttribute("mensajeExito");
             
-            request.getRequestDispatcher("/Usuario.jsp").forward(request, response);
+            // Use sendRedirect instead of forward for better URL handling
+            response.sendRedirect(request.getContextPath() + "/Usuario.jsp");
         } else {
             HttpSession session = request.getSession(); 
             session.setAttribute("mensajeError", "Credenciales incorrectas. Intente de nuevo.");
-            request.getRequestDispatcher("/paginas/login.jsp").forward(request, response);
+            response.sendRedirect(request.getContextPath() + "/paginas/login.jsp");
         }
     }
 
     private void registrar(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+    
         String nuevoUsuario = request.getParameter("nuevoUsuario");
         String nombreCompleto = request.getParameter("nombreCompleto");
         String nuevaContrasena = request.getParameter("nuevaContrasena");
@@ -111,9 +127,10 @@ public class ServletControlador extends HttpServlet {
         HttpSession session = request.getSession();
         
         // Validate passwords match
-        if (!nuevaContrasena.equals(confirmarContrasena)) {
+        if (nuevaContrasena == null || confirmarContrasena == null || 
+            !nuevaContrasena.equals(confirmarContrasena)) {
             session.setAttribute("mensajeError", "Las contraseñas no coinciden.");
-            request.getRequestDispatcher("/paginas/login.jsp").forward(request, response);
+            response.sendRedirect(request.getContextPath() + "/paginas/login.jsp");
             return;
         }
         
@@ -122,31 +139,53 @@ public class ServletControlador extends HttpServlet {
             nombreCompleto == null || nombreCompleto.trim().isEmpty() ||
             nuevaContrasena == null || nuevaContrasena.trim().isEmpty()) {
             session.setAttribute("mensajeError", "Todos los campos son obligatorios.");
-            request.getRequestDispatcher("/paginas/login.jsp").forward(request, response);
+            response.sendRedirect(request.getContextPath() + "/paginas/login.jsp");
             return;
         }
         
-        Usuario nuevoUsuarioObj = new Usuario(nuevoUsuario.trim(), nuevaContrasena, nombreCompleto.trim());
+        // Validate length constraints
+        String nuevoUsuarioTrimmed = nuevoUsuario.trim();
+        String nombreCompletoTrimmed = nombreCompleto.trim();
+        
+        if (nuevoUsuarioTrimmed.length() > 50) {
+            session.setAttribute("mensajeError", "El nombre de usuario no puede exceder 50 caracteres.");
+            response.sendRedirect(request.getContextPath() + "/paginas/login.jsp");
+            return;
+        }
+        
+        if (nombreCompletoTrimmed.length() > 100) {
+            session.setAttribute("mensajeError", "El nombre completo no puede exceder 100 caracteres.");
+            response.sendRedirect(request.getContextPath() + "/paginas/login.jsp");
+            return;
+        }
+        
+        if (nuevaContrasena.length() > 255) {
+            session.setAttribute("mensajeError", "La contraseña no puede exceder 255 caracteres.");
+            response.sendRedirect(request.getContextPath() + "/paginas/login.jsp");
+            return;
+        }
+        
+        Usuario nuevoUsuarioObj = new Usuario(nuevoUsuarioTrimmed, nuevaContrasena, nombreCompletoTrimmed);
         UsuarioDAO usuarioDao = new UsuarioDAO();
         
-        
-        Usuario usuarioExistente = usuarioDao.buscarPorId(nuevoUsuario.trim());
+        // Check if user already exists
+        Usuario usuarioExistente = usuarioDao.buscarPorId(nuevoUsuarioTrimmed);
         if (usuarioExistente != null) {
             session.setAttribute("mensajeError", "El usuario ya existe. Por favor, elija otro nombre de usuario.");
-            request.getRequestDispatcher("/paginas/login.jsp").forward(request, response);
+            response.sendRedirect(request.getContextPath() + "/paginas/login.jsp");
             return;
         }
         
-       
+        // Insert new user
         boolean creado = usuarioDao.insertar(nuevoUsuarioObj);
         
         if (creado) {
             session.setAttribute("mensajeExito", "Cuenta creada exitosamente. Por favor, inicie sesión.");
             session.removeAttribute("mensajeError");
-            request.getRequestDispatcher("/paginas/login.jsp").forward(request, response);
+            response.sendRedirect(request.getContextPath() + "/paginas/login.jsp");
         } else {
-            session.setAttribute("mensajeError", "Error al crear la cuenta. Intente de nuevo.");
-            request.getRequestDispatcher("/paginas/login.jsp").forward(request, response);
+            session.setAttribute("mensajeError", "Error al crear la cuenta. Verifique los datos e intente de nuevo.");
+            response.sendRedirect(request.getContextPath() + "/paginas/login.jsp");
         }
     }
 
@@ -156,6 +195,6 @@ public class ServletControlador extends HttpServlet {
         if (session != null) {
             session.invalidate(); 
         }
-        request.getRequestDispatcher("/paginas/login.jsp").forward(request, response);
+        response.sendRedirect(request.getContextPath() + "/paginas/login.jsp");
     }
 }
