@@ -13,17 +13,53 @@ import java.sql.DriverManager;
 import java.sql.SQLException; 
 
 public class Conexion {
-       // CONFIGURACIONN  ------ MODIFIQUEN ESTO SEGUN LA INFORMACIÓN SEGUN SU PUERTO-CONTRSEÑA 
-    private static final String URL = "jdbc:postgresql://localhost:5434/proyecto";
-    private static final String USER = "postgres";
-    private static final String PASS = "hdp";  
+      
+    private static final String JDBC_URL = "jdbc:postgresql://localhost:5432/proyecto";
+    private static final String JDBC_USER = "proyecto";  
+    private static final String JDBC_PASSWORD = "proyecto";
+    
+    
     public static Connection getConnection() throws SQLException {
         try {
+            
             Class.forName("org.postgresql.Driver");
-            return DriverManager.getConnection(URL, USER, PASS);
         } catch (ClassNotFoundException e) {
-            throw new SQLException("No se encontró el Driver de PostgreSQL", e);
+            throw new SQLException("PostgreSQL JDBC Driver not found", e);
+        }
+        
+        return DriverManager.getConnection(JDBC_URL, JDBC_USER, JDBC_PASSWORD);
+    }
+    
+    
+    public static void close(Connection conn) {
+        try {
+            if (conn != null) {
+                conn.close();
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace(System.err);
         }
     }
     
+  
+    public static void close(java.sql.PreparedStatement stmt) {
+        try {
+            if (stmt != null) {
+                stmt.close();
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace(System.err);
+        }
     }
+    
+    
+    public static void close(java.sql.ResultSet rs) {
+        try {
+            if (rs != null) {
+                rs.close();
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace(System.err);
+        }
+    }
+}

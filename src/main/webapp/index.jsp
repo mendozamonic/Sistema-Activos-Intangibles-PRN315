@@ -1,22 +1,25 @@
 <%-- 
     Document   : index
-    Created on : 13 nov 2025, 15:19:02
-    Author     : monic
+    Created on : 16 nov 2025, 08:47:57
+    Author     : lulic
 --%>
 
 <%@page contentType="text/html" pageEncoding="UTF-8"%>
-
-
+<%@page session="true"%>
 <!DOCTYPE html>
 <html>
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <title>SISTEMA DE CONTROL DE ACTIVOS INTANGIBLES</title>
+    <title>Redirigiendo...</title>
 </head>
 <body>
-
-    <%@ include file="navbar.jsp" %>
-
-    <h1>Hello World!</h1>
+    <%
+        String usuario = (String) session.getAttribute("usuario");
+        if (usuario != null) {
+            response.sendRedirect(request.getContextPath() + "/Usuario.jsp");
+        } else {
+            response.sendRedirect(request.getContextPath() + "/paginas/login.jsp");
+        }
+    %>
 </body>
 </html>
