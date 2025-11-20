@@ -6,128 +6,7 @@
 
 <%@page contentType="text/html" pageEncoding="UTF-8"%>
 
-<style>
-    body {
-        margin: 0;
-        font-family: 'Segoe UI';
-    }
-
-    .navbar {
-        background: linear-gradient(135deg, #1976d2 0%, #1abc9c 100%);
-        padding: 0;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
-        position: relative;
-        z-index: 1000;
-    }
-
-    .navbar-inner {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        width: 100%;
-        max-width: 1200px;
-        padding: 15px 40px;
-    }
-
-    .navbar-brand {
-        font-weight: 700;
-        font-size: 24px;
-        color: #ffffff;
-        letter-spacing: 1.5px;
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        transition: transform 0.3s ease, text-shadow 0.3s ease;
-        cursor: pointer;
-    }
-
-    .navbar-brand:hover {
-        transform: translateY(-2px);
-        text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-    }
-
-    .navbar-menu {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-    }
-
-    .navbar-menu a {
-        color: #ffffff;
-        text-decoration: none;
-        font-size: 15px;
-        font-weight: 500;
-        padding: 10px 20px;
-        border-radius: 8px;
-        transition: all 0.3s ease;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .navbar-menu a::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: rgba(255, 255, 255, 0.1);
-        transition: left 0.3s ease;
-        z-index: -1;
-    }
-
-    .navbar-menu a:hover::before {
-        left: 0;
-    }
-
-    .navbar-menu a:hover {
-        background: rgba(255, 255, 255, 0.15);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    }
-
-    .navbar-menu a:active {
-        transform: translateY(0);
-    }
-
-    /* Efecto de línea inferior en hover */
-    .navbar-menu a::after {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 50%;
-        width: 0;
-        height: 2px;
-        background: #ffffff;
-        transition: all 0.3s ease;
-        transform: translateX(-50%);
-    }
-
-    .navbar-menu a:hover::after {
-        width: 70%;
-    }
-
-    /* Responsive para pantallas pequeñas */
-    @media (max-width: 768px) {
-        .navbar-inner {
-            flex-direction: column;
-            gap: 15px;
-            padding: 15px 20px;
-        }
-
-        .navbar-menu {
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 5px;
-        }
-
-        .navbar-menu a {
-            padding: 8px 15px;
-            font-size: 14px;
-        }
-    }
-</style>
+<link rel="stylesheet" type="text/css" href="<%= request.getContextPath() %>/css/navbar.css">
 
 <nav class="navbar">
     <div class="navbar-inner">
@@ -137,7 +16,7 @@
 
         <div class="navbar-menu">
             <a href="index.jsp">Inicio</a>
-            <a href="#">Gestión de intangibles</a>
+         <a href="<%= request.getContextPath() %>/IntangibleControlador?accion=listar"> Gestión </a>
             <a href="#">Reporte</a>
             <a href="#">Historial</a>
         </div>

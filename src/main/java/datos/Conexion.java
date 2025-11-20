@@ -10,20 +10,26 @@ package datos;
  */
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.SQLException; 
+import java.sql.SQLException;
 
 public class Conexion {
-       // CONFIGURACIONN  ------ MODIFIQUEN ESTO SEGUN LA INFORMACIÓN SEGUN SU PUERTO-CONTRSEÑA 
-    private static final String URL = "jdbc:postgresql://localhost:5434/proyecto";
-    private static final String USER = "postgres";
-    private static final String PASS = "hdp";  
+
+    private static Connection conexion = null;
+
     public static Connection getConnection() throws SQLException {
-        try {
-            Class.forName("org.postgresql.Driver");
-            return DriverManager.getConnection(URL, USER, PASS);
-        } catch (ClassNotFoundException e) {
-            throw new SQLException("No se encontró el Driver de PostgreSQL", e);
+        if (conexion == null || conexion.isClosed()) {
+            try {
+                Class.forName("org.postgresql.Driver");
+            } catch (ClassNotFoundException ex) {
+                throw new SQLException("No se encontró el driver de PostgreSQL", ex);
+            }
+
+            String url = "jdbc:postgresql://localhost:5434/proyecto";
+            String usuario = "postgres";  
+            String password = "hdp"; 
+
+            conexion = DriverManager.getConnection(url, usuario, password);
         }
+        return conexion;
     }
-    
-    }
+}
