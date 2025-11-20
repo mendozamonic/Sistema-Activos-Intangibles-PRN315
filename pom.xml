@@ -26,8 +26,6 @@
             <version>42.7.3</version>   
             <scope>runtime</scope>
         </dependency>
-        
-
     </dependencies>
     
     <build>

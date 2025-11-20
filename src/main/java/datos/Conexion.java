@@ -32,4 +32,34 @@ public class Conexion {
         }
         return conexion;
     }
+    
+    public static void close(Connection conn) {
+        try {
+            if (conn != null && !conn.isClosed()) {
+                conn.close();
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace(System.err);
+        }
+    }
+    
+    public static void close(java.sql.PreparedStatement stmt) {
+        try {
+            if (stmt != null) {
+                stmt.close();
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace(System.err);
+        }
+    }
+    
+    public static void close(java.sql.ResultSet rs) {
+        try {
+            if (rs != null) {
+                rs.close();
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace(System.err);
+        }
+    }
 }
