@@ -20,9 +20,9 @@
     <%
         List<Historial> lista = (List<Historial>) request.getAttribute("lista");
         Integer total = (Integer) request.getAttribute("total");
-        Integer page = (Integer) request.getAttribute("page");
-        Integer size = (Integer) request.getAttribute("size");
-        Integer totalPages = (Integer) request.getAttribute("totalPages");
+        Integer pageNum = (Integer) request.getAttribute("page");
+        Integer pageSize = (Integer) request.getAttribute("size");
+        Integer totalPagesNum = (Integer) request.getAttribute("totalPages");
 
         String usuario = (String) request.getAttribute("usuario");
         String proveedor = (String) request.getAttribute("proveedor");
@@ -58,9 +58,9 @@
                 HistorialDAO dao = new HistorialDAO();
                 total = dao.contar(f);
                 lista = dao.listar(f);
-                size = s;
-                page = p;
-                totalPages = (int) Math.ceil((double) total / size);
+                pageSize = s;
+                pageNum = p;
+                totalPagesNum = (int) Math.ceil((double) total / pageSize);
             } catch (Exception e) {
                 out.println("<div class='alert alert-danger'>Error cargando historial: " + e.getMessage() + "</div>");
             }
@@ -91,8 +91,8 @@
         <div class="col-md-2 align-self-end">
             <button type="submit" class="btn btn-primary w-100">Filtrar</button>
         </div>
-        <input type="hidden" name="page" value="<%= page != null ? page : 1 %>">
-        <input type="hidden" name="size" value="<%= size != null ? size : 10 %>">
+        <input type="hidden" name="page" value="<%= pageNum != null ? pageNum : 1 %>">
+        <input type="hidden" name="size" value="<%= pageSize != null ? pageSize : 10 %>">
     </form>
 
     <div class="card">
@@ -140,9 +140,9 @@
             <div>
                 <%
                     int totalVal = total != null ? total : 0;
-                    int pageVal = page != null ? page : 1;
-                    int sizeVal = size != null ? size : 10;
-                    int totalPagesVal = totalPages != null ? totalPages : 1;
+                    int pageVal = pageNum != null ? pageNum : 1;
+                    int sizeVal = pageSize != null ? pageSize : 10;
+                    int totalPagesVal = totalPagesNum != null ? totalPagesNum : 1;
                 %>
                 <span>Mostrando página <%= pageVal %> de <%= totalPagesVal %> — <%= totalVal %> registros</span>
             </div>
