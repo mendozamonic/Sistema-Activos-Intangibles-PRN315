@@ -34,11 +34,15 @@ public class HistorialControlador extends HttpServlet {
 
     private void listar(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        String usuario = trim(request.getParameter("usuario"));
         String proveedor = trim(request.getParameter("proveedor"));
         String codigo = trim(request.getParameter("codigo"));
+        String nombreIntangible = trim(request.getParameter("nombreIntangible"));
+        String tipoLicencia = trim(request.getParameter("tipoLicencia"));
+        String idIntangible = trim(request.getParameter("idIntangible"));
         String fechaDesde = trim(request.getParameter("desde"));
         String fechaHasta = trim(request.getParameter("hasta"));
+        Integer mes = parseInt(request.getParameter("mes"), null);
+        Integer anio = parseInt(request.getParameter("anio"), null);
 
         int page = parseInt(request.getParameter("page"), 1);
         int size = parseInt(request.getParameter("size"), 10);
@@ -48,11 +52,15 @@ public class HistorialControlador extends HttpServlet {
         int offset = (page - 1) * size;
 
         HistorialDAO.Filtros filtros = new HistorialDAO.Filtros();
-        filtros.usuario = usuario;
         filtros.proveedor = proveedor;
         filtros.codigo = codigo;
+        filtros.nombreIntangible = nombreIntangible;
+        filtros.tipoLicencia = tipoLicencia;
+        filtros.idIntangible = idIntangible;
         filtros.fechaDesde = fechaDesde;
         filtros.fechaHasta = fechaHasta;
+        filtros.mes = mes;
+        filtros.anio = anio;
         filtros.offset = offset;
         filtros.limit = size;
 
@@ -69,13 +77,17 @@ public class HistorialControlador extends HttpServlet {
             request.setAttribute("size", size);
             request.setAttribute("totalPages", totalPages);
 
-            request.setAttribute("usuario", usuario);
             request.setAttribute("proveedor", proveedor);
             request.setAttribute("codigo", codigo);
+            request.setAttribute("nombreIntangible", nombreIntangible);
+            request.setAttribute("tipoLicencia", tipoLicencia);
+            request.setAttribute("idIntangible", idIntangible);
             request.setAttribute("desde", fechaDesde);
             request.setAttribute("hasta", fechaHasta);
+            request.setAttribute("mes", mes);
+            request.setAttribute("anio", anio);
 
-            request.getRequestDispatcher("/paginas/historial.jsp").forward(request, response);
+            request.getRequestDispatcher("/paginas/historial/historial.jsp").forward(request, response);
         } catch (SQLException e) {
             throw new ServletException("Error al listar historial", e);
         }
@@ -87,7 +99,13 @@ public class HistorialControlador extends HttpServlet {
 
     private int parseInt(String s, int def) {
         try { return Integer.parseInt(s); }
-        catch (Exception e) { return def; }
+        catch (NumberFormatException | NullPointerException e) { return def; }
+    }
+    
+    private Integer parseInt(String s, Integer def) {
+        if (s == null || s.trim().isEmpty()) return def;
+        try { return Integer.parseInt(s.trim()); }
+        catch (NumberFormatException e) { return def; }
     }
 }
 

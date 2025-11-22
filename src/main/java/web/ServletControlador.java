@@ -81,7 +81,7 @@ public class ServletControlador extends HttpServlet {
         if (idUsuario == null || idUsuario.trim().isEmpty() ||
             contrasena == null || contrasena.trim().isEmpty()) {
             HttpSession session = request.getSession();
-            session.setAttribute("mensajeError", "Por favor, complete todos los campos.");
+            session.setAttribute("mensajeError", "Por favor, complete todos los campos obligatorios.");
             response.sendRedirect(request.getContextPath() + "/paginas/login.jsp");
             return;
         }
@@ -110,7 +110,7 @@ public class ServletControlador extends HttpServlet {
         } else {
             System.out.println("✗ Login fallido - Credenciales no válidas");
             HttpSession session = request.getSession(); 
-            session.setAttribute("mensajeError", "Credenciales incorrectas. Verifique su usuario y contraseña.");
+            session.setAttribute("mensajeError", "Las credenciales son incorrectas. Verifique su usuario y contraseña.");
             response.sendRedirect(request.getContextPath() + "/paginas/login.jsp");
         }
     }
@@ -128,7 +128,7 @@ public class ServletControlador extends HttpServlet {
         // Validate passwords match
         if (nuevaContrasena == null || confirmarContrasena == null || 
             !nuevaContrasena.equals(confirmarContrasena)) {
-            session.setAttribute("mensajeError", "Las contraseñas no coinciden.");
+            session.setAttribute("mensajeError", "Las contraseñas no coinciden. Por favor, verifíquelas.");
             response.sendRedirect(request.getContextPath() + "/paginas/login.jsp");
             return;
         }
@@ -179,11 +179,11 @@ public class ServletControlador extends HttpServlet {
         boolean creado = usuarioDao.insertar(nuevoUsuarioObj);
         
         if (creado) {
-            session.setAttribute("mensajeExito", "Cuenta creada exitosamente. Por favor, inicie sesión.");
+            session.setAttribute("mensajeExito", "La cuenta ha sido creada exitosamente. Por favor, inicie sesión.");
             session.removeAttribute("mensajeError");
             response.sendRedirect(request.getContextPath() + "/paginas/login.jsp");
         } else {
-            session.setAttribute("mensajeError", "Error al crear la cuenta. Verifique los datos e intente de nuevo.");
+            session.setAttribute("mensajeError", "Ocurrió un error al crear la cuenta. Verifique los datos e intente nuevamente.");
             response.sendRedirect(request.getContextPath() + "/paginas/login.jsp");
         }
     }

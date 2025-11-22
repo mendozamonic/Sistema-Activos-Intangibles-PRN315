@@ -1,0 +1,57 @@
+===========================================
+INSTRUCCIONES PARA VER LOS CAMBIOS EN NETBEANS
+===========================================
+
+PASOS PARA VER LOS CAMBIOS VISUALES:
+
+1. DETENER EL SERVIDOR (si está corriendo):
+   - Clic derecho en el servidor en la ventana "Services"
+   - Seleccionar "Stop"
+
+2. LIMPIAR Y CONSTRUIR EL PROYECTO:
+   - Clic derecho en el proyecto "SISTEMA_ACTIVOS_INTANGIBLES"
+   - Seleccionar "Clean and Build"
+   - Esperar a que termine la compilación
+
+3. LIMPIAR CACHÉ DEL NAVEGADOR:
+   - Abrir el navegador (Chrome, Firefox, Edge, etc.)
+   - Presionar: Ctrl + Shift + Delete
+   - Seleccionar "Caché" o "Cached images and files"
+   - Clic en "Borrar datos" o "Clear data"
+
+4. REINICIAR EL SERVIDOR:
+   - Clic derecho en el proyecto
+   - Seleccionar "Run"
+   - Esperar a que inicie el servidor
+
+5. RECARGAR LA PÁGINA CON CACHÉ LIMPIO:
+   - En el navegador, presionar: Ctrl + F5 (recarga forzada)
+   - O presionar: Ctrl + Shift + R
+
+CAMBIOS QUE DEBERÍAS VER:
+
+✅ Fondo morado/azul en lugar de gris claro
+✅ Encabezados con gradiente oscuro y borde azul brillante
+✅ Botones con colores vibrantes (morado, rosa, azul claro)
+✅ Navbar con gradiente oscuro
+✅ Login con fondo morado y sombras más pronunciadas
+✅ Efectos hover más dramáticos en botones
+
+SI AÚN NO VES LOS CAMBIOS:
+
+1. Verifica que los archivos se guardaron:
+   - Usuario.jsp
+   - paginas/login.jsp
+   - paginas/gestionIntangibles/listadoIntangibles.jsp
+
+2. Cierra completamente NetBeans y vuelve a abrirlo
+
+3. Verifica que estás editando los archivos en:
+   src/main/webapp/ (NO en target/)
+
+4. Si usas un servidor externo (GlassFish/Tomcat):
+   - Elimina el WAR desplegado
+   - Vuelve a desplegar el proyecto
+
+===========================================
+

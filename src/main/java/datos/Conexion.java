@@ -24,9 +24,9 @@ public class Conexion {
                 throw new SQLException("No se encontró el driver de PostgreSQL", ex);
             }
 
-            String url = "jdbc:postgresql://localhost/proyecto";
+            String url = "jdbc:postgresql://localhost:5434/proyecto";
             String usuario = "postgres";  
-            String password = "admin"; 
+            String password = "hdp"; 
 
             conexion = DriverManager.getConnection(url, usuario, password);
         }

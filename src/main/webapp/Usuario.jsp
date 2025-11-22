@@ -104,7 +104,7 @@
                     
                     <div class="col-md-4">
                         <button class="btn btn-menu btn-success text-white" 
-                                onclick="window.location.href='${pageContext.request.contextPath}/paginas/reporte.jsp'">
+                                onclick="window.location.href='${pageContext.request.contextPath}/ReporteControlador?modo=mes&mes=<%= java.time.LocalDate.now().getMonthValue() %>&anio=<%= java.time.LocalDate.now().getYear() %>'">
                             <i class="bi bi-graph-up-arrow menu-icon"></i>
                             <h4>Reporte Financiero y Contable</h4>
                             <p class="mb-0">Ver reportes financieros</p>
@@ -113,7 +113,7 @@
                     
                     <div class="col-md-4">
                         <button class="btn btn-menu btn-secondary text-white" 
-                                onclick="window.location.href='${pageContext.request.contextPath}/paginas/historial.jsp'">
+                                onclick="window.location.href='${pageContext.request.contextPath}/HistorialControlador?accion=listar'">
                             <i class="bi bi-clock-history menu-icon"></i>
                             <h4>Historial</h4>
                             <p class="mb-0">Ver historial de operaciones</p>

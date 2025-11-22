@@ -38,8 +38,8 @@ input, select {
 
 input:focus, select:focus {
     outline: none;
-    border-color: #1976d2;
-    box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.1);
+    border-color: #1565c0;
+    box-shadow: 0 0 0 4px rgba(21, 101, 192, 0.1);
     background-color: #fafafa;
 }
 

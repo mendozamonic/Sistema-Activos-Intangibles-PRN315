@@ -27,8 +27,8 @@
         %>
 
         <p>
-            ¿Está seguro que desea eliminar el intangible con ID:
-            <span class="id-box"><%= id %></span> ?
+            ¿Está seguro de que desea eliminar el intangible con ID:
+            <span class="id-box"><%= id %></span>?
         </p>
 
         <p>Esta acción no se puede deshacer.</p>
@@ -48,3 +48,4 @@
     </div>
 </body>
 </html>
+

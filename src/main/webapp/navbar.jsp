@@ -17,8 +17,9 @@
         <div class="navbar-menu">
             <a href="index.jsp">Inicio</a>
          <a href="<%= request.getContextPath() %>/IntangibleControlador?accion=listar"> Gestión </a>
-            <a href="#">Reporte</a>
-            <a href="#">Historial</a>
+            <a href="<%= request.getContextPath() %>/AmortizacionControlador?accion=listar">Amortizaciones</a>
+            <a href="<%= request.getContextPath() %>/ReporteControlador">Reporte</a>
+            <a href="<%= request.getContextPath() %>/HistorialControlador?accion=listar">Historial</a>
         </div>
     </div>
 </nav>

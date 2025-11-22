@@ -7,13 +7,100 @@
 <%@page import="modelo.Intangible"%>
 
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Listado de intangibles</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Activos Intangibles - Sistema de Gestión</title>
     <link rel="stylesheet" type="text/css" href="<%= request.getContextPath() %>/css/estilos.css">
     <link rel="stylesheet" type="text/css" href="<%= request.getContextPath() %>/css/listado.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif;
+        }
+        
+        .page-header {
+            background: #283593;
+            color: white;
+            padding: 40px 45px;
+            border-radius: 12px 12px 0 0;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+            margin-bottom: 0;
+            border-top: 4px solid #1565c0;
+        }
+        
+        .page-header h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin: 0;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .page-header h1 i {
+            font-size: 36px;
+            opacity: 0.95;
+        }
+        
+        .page-content {
+            background: #ffffff;
+            border-radius: 0 0 12px 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.06);
+            padding: 35px 40px;
+            border-top: none;
+        }
+        
+        .barra-superior {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 25px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .barra-superior h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1e3a5f;
+            margin: 0;
+            letter-spacing: -0.3px;
+        }
+        
+        .btn-primario {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            font-weight: 600;
+            font-size: 14px;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(25, 118, 210, 0.2);
+        }
+        
+        .btn-primario:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
+        }
+        
+        .sin-datos {
+            padding: 40px;
+            font-style: italic;
+            color: #6c757d;
+            text-align: center;
+            font-size: 16px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 1px solid #e9ecef;
+        }
+    </style>
 </head>
 <body>
 
@@ -21,14 +108,22 @@
     <jsp:include page="/navbar.jsp" />
 
     <div class="container">
-        <div class="barra-superior">
-            <h1>Gestión de intangibles</h1>
-
-            <a class="btn btn-primario"
-               href="<%= request.getContextPath() %>/IntangibleControlador?accion=nuevo">
-                + Registrar intangible
-            </a>
+        <div class="page-header">
+            <h1>
+                <i class="bi bi-file-earmark-text"></i>
+                Gestión de Activos Intangibles
+            </h1>
         </div>
+        
+        <div class="page-content">
+            <div class="barra-superior">
+                <h1>Registro de Activos Intangibles</h1>
+
+                <a class="btn btn-primario"
+                   href="<%= request.getContextPath() %>/IntangibleControlador?accion=nuevo">
+                    <i class="bi bi-plus-circle"></i> Registrar Nuevo Intangible
+                </a>
+            </div>
 
         <%
             // Recuperamos la lista enviada por el servlet
@@ -97,7 +192,7 @@
                             </a>
                             <a class="btn btn-accion btn-eliminar"
                                href="<%= request.getContextPath() %>/IntangibleControlador?accion=eliminar&idintangible=<%= i.getIdIntangible() %>"
-                               onclick="return confirm('¿Seguro que deseas eliminar este intangible?');">
+                               onclick="return confirm('¿Está seguro de que desea eliminar este intangible?');">
                                 Eliminar
                             </a>
                            
@@ -182,3 +277,4 @@
     </script>
 </body>
 </html>
+

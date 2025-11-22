@@ -101,7 +101,7 @@ public class IntangibleControlador extends HttpServlet {
             List<Intangible> lista = dao.listarIntangibles();
 
             request.setAttribute("listaIntangibles", lista);
-            request.getRequestDispatcher("/WEB-INF/paginas/gestionIntangibles/listadoIntangibles.jsp")
+            request.getRequestDispatcher("/paginas/gestionIntangibles/listadoIntangibles.jsp")
                     .forward(request, response);
 
         } catch (SQLException ex) {
@@ -113,7 +113,7 @@ public class IntangibleControlador extends HttpServlet {
     private void mostrarFormularioNuevo(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
-        request.getRequestDispatcher("/WEB-INF/paginas/gestionIntangibles/agregarIntangibles.jsp")
+        request.getRequestDispatcher("/paginas/gestionIntangibles/agregarIntangibles.jsp")
                .forward(request, response);
     }
 
@@ -162,7 +162,7 @@ public class IntangibleControlador extends HttpServlet {
             // reenviar al formulario con mensaje y valores que el usuario ya puso
             request.setAttribute("errorValidacion", errores);
             request.setAttribute("intangible", i);
-            request.getRequestDispatcher("/WEB-INF/paginas/gestionIntangibles/agregarIntangibles.jsp")
+            request.getRequestDispatcher("/paginas/gestionIntangibles/agregarIntangibles.jsp")
                    .forward(request, response);
             return; // IMPORTANTÍSIMO: detener aquí, no guardar
         }
@@ -190,7 +190,7 @@ public class IntangibleControlador extends HttpServlet {
             Intangible i = dao.obtenerIntangiblePorId(id);
 
             request.setAttribute("intangible", i);
-            request.getRequestDispatcher("/WEB-INF/paginas/gestionIntangibles/modificarIntangibles.jsp")
+            request.getRequestDispatcher("/paginas/gestionIntangibles/modificarIntangibles.jsp")
                    .forward(request, response);
 
         } catch (SQLException ex) {
@@ -243,7 +243,7 @@ public class IntangibleControlador extends HttpServlet {
             // reenvia al formulario con mensaje y valores
             request.setAttribute("errorValidacion", errores);
             request.setAttribute("intangible", i);
-            request.getRequestDispatcher("/WEB-INF/paginas/gestionIntangibles/modificarIntangibles.jsp")
+            request.getRequestDispatcher("/paginas/gestionIntangibles/modificarIntangibles.jsp")
                    .forward(request, response);
             return;   // recordar que esto me permite no pasar si no hic cambios
         }
@@ -267,7 +267,7 @@ public class IntangibleControlador extends HttpServlet {
         String id = request.getParameter("idintangible");
         request.setAttribute("idintangible", id);
 
-        request.getRequestDispatcher("/WEB-INF/paginas/gestionIntangibles/eliminarIntangibles.jsp")
+        request.getRequestDispatcher("/paginas/gestionIntangibles/eliminarIntangibles.jsp")
                .forward(request, response);
     }
 
@@ -293,7 +293,7 @@ private String validarIntangible(Intangible i) {
 
     // 1) Costo > 0
     if (i.getCosto() <= 0) {
-        errores.append("• El costo debe ser mayor que 0.<br>");
+        errores.append("• El costo debe ser mayor que cero.<br>");
     }
 
     // 2) Fechas + relación con vida útil (en meses)
@@ -317,22 +317,22 @@ private String validarIntangible(Intangible i) {
                 // En ambos casos comparamos en MESES
                 if ("MENSUAL".equalsIgnoreCase(modalidad)) {
                     if (meses != vidaNum) {
-                        errores.append("• Con modalidad MENSUAL la vida útil (en meses) debe coincidir con los meses entre la fecha de adquisición y vencimiento (actualmente hay ")
+                        errores.append("• Con modalidad MENSUAL, la vida útil (en meses) debe coincidir con los meses entre la fecha de adquisición y vencimiento (actualmente hay ")
                                .append(meses)
-                               .append(" meses).<br>");
+                               .append(" mes(es)).<br>");
                     }
                 } else if ("ANUAL".equalsIgnoreCase(modalidad)) {
                     if (meses != vidaNum) {
-                        errores.append("• Con modalidad ANUAL la vida útil (en meses) debe coincidir con los meses entre la fecha de adquisición y vencimiento (actualmente hay ")
+                        errores.append("• Con modalidad ANUAL, la vida útil (en meses) debe coincidir con los meses entre la fecha de adquisición y vencimiento (actualmente hay ")
                                .append(meses)
-                               .append(" meses).<br>");
+                               .append(" mes(es)).<br>");
                     }
                 }
             }
         }
 
     } catch (DateTimeParseException e) {
-        errores.append("• Formato de fechas inválido. Use el selector de calendario.<br>");
+        errores.append("• El formato de fechas es inválido. Use el selector de calendario.<br>");
     }
 
  
