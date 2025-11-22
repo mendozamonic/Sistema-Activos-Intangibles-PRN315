@@ -1,0 +1,863 @@
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 16.9
+-- Dumped by pg_dump version 16.9
+
+-- Started on 2025-11-22 08:02:32
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- TOC entry 223 (class 1255 OID 57760)
+-- Name: f_vida_en_anios(text); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.f_vida_en_anios(v text) RETURNS integer
+    LANGUAGE sql IMMUTABLE
+    AS $_$
+  SELECT CASE
+    WHEN v IS NULL OR btrim(v) = '' THEN 1
+    WHEN lower(v) LIKE 'perpetua%' THEN NULL                 -- vida indefinida (no se amortiza)
+    WHEN v ~ '^[0-9]+$' THEN v::int                          -- ya viene "36" o "3"
+    WHEN lower(v) LIKE '%mes%' THEN                          -- "12 meses", "60 Meses", etc.
+         CEIL(NULLIF(regexp_replace(v,'\D','','g'),'')::numeric / 12)::int
+    WHEN lower(v) LIKE '%año%' OR lower(v) LIKE '%anio%' THEN
+         NULLIF(regexp_replace(v,'\D','','g'),'')::int       -- "3 años", "5 anios"
+    ELSE 1                                                   -- fallback
+  END;
+$_$;
+
+
+ALTER FUNCTION public.f_vida_en_anios(v text) OWNER TO postgres;
+
+--
+-- TOC entry 235 (class 1255 OID 57753)
+-- Name: fn_detalle_autocompletar(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.fn_detalle_autocompletar() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $_$
+DECLARE
+  modal varchar(10);
+  vida_text text;
+  vida_anios int;
+  costo numeric;
+  meses_por_periodo int := 1;
+  amort_por_periodo numeric;
+
+BEGIN
+  SELECT COALESCE(i.modalidad_amortizacion,'MENSUAL'),
+         i.vida_util::text, i.costo
+  INTO   modal, vida_text, costo
+  FROM public.intangible i
+  WHERE i.idintangible = NEW.idintangible;
+
+  -- vida_util puede venir como "24 meses", "3 años", "36", etc.
+  vida_anios := CASE
+                  WHEN vida_text ~ '^[0-9]+$' THEN vida_text::int
+                  WHEN lower(vida_text) LIKE '%mes%' THEN CEIL(NULLIF(regexp_replace(vida_text,'\D','','g'),'')::int / 12.0)
+                  WHEN lower(vida_text) LIKE '%año%' OR lower(vida_text) LIKE '%anio%' THEN NULLIF(regexp_replace(vida_text,'\D','','g'),'')::int
+                  ELSE 1
+                END;
+
+  IF modal = 'ANUAL' THEN
+    meses_por_periodo := 12;
+    amort_por_periodo := ROUND(costo / vida_anios, 2);
+  ELSE
+    meses_por_periodo := 1;
+    amort_por_periodo := ROUND(costo / (vida_anios*12), 2);
+  END IF;
+
+  -- Fecha de cuota si vino nula
+  IF NEW.fecha_cuota IS NULL THEN
+    NEW.fecha_cuota := (
+      SELECT (i.fecha_adquisicion + (NEW.numero_cuota - 1) * (meses_por_periodo || ' month')::interval)::date
+      FROM public.intangible i
+      WHERE i.idintangible = NEW.idintangible
+    );
+  END IF;
+
+  -- Monto (si no lo mandan)
+  IF NEW.monto IS NULL THEN
+    NEW.monto := amort_por_periodo;
+  END IF;
+
+  -- Columnas de apoyo (opcionales)
+  NEW.amortizacion_mensual := ROUND(costo / (vida_anios*12), 2);
+  NEW.amortizacion_anual   := ROUND(costo / vida_anios, 2);
+
+  RETURN NEW;
+END;
+$_$;
+
+
+ALTER FUNCTION public.fn_detalle_autocompletar() OWNER TO postgres;
+
+--
+-- TOC entry 222 (class 1255 OID 57742)
+-- Name: fn_set_fecha_cuota(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.fn_set_fecha_cuota() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF NEW.fecha_cuota IS NULL THEN
+    NEW.fecha_cuota := (
+      SELECT (i.fecha_adquisicion + (NEW.numero_cuota - 1) * INTERVAL '1 month')::date
+      FROM public.intangible i
+      WHERE i.idintangible = NEW.idintangible
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.fn_set_fecha_cuota() OWNER TO postgres;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- TOC entry 215 (class 1259 OID 57646)
+-- Name: detalleamortizacion; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.detalleamortizacion (
+    iddetalle character varying(10) NOT NULL,
+    idintangible character varying(10) NOT NULL,
+    numero_cuota integer NOT NULL,
+    monto numeric(10,2) NOT NULL,
+    amortizacion_mensual numeric(10,2) NOT NULL,
+    amortizacion_anual numeric(10,2),
+    fecha_cuota date
+);
+
+
+ALTER TABLE public.detalleamortizacion OWNER TO postgres;
+
+--
+-- TOC entry 216 (class 1259 OID 57653)
+-- Name: historial; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.historial (
+    idhistorial character varying(10) NOT NULL
+);
+
+
+ALTER TABLE public.historial OWNER TO postgres;
+
+--
+-- TOC entry 221 (class 1259 OID 82839)
+-- Name: historial_idhistorial_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.historial_idhistorial_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.historial_idhistorial_seq OWNER TO postgres;
+
+--
+-- TOC entry 4944 (class 0 OID 0)
+-- Dependencies: 221
+-- Name: historial_idhistorial_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.historial_idhistorial_seq OWNED BY public.historial.idhistorial;
+
+
+--
+-- TOC entry 217 (class 1259 OID 57660)
+-- Name: intangible; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.intangible (
+    idintangible character varying(10) NOT NULL,
+    version character varying(25) NOT NULL,
+    nombre_proveedor character varying(25) NOT NULL,
+    tipo_licencia_ character varying(25) NOT NULL,
+    codigo_ character varying(25) NOT NULL,
+    costo numeric(10,2) NOT NULL,
+    vida_util character varying(25) NOT NULL,
+    estado_ character varying(25) NOT NULL,
+    nombre_intangible character varying(50) NOT NULL,
+    fecha_adquisicion date,
+    fecha_vencimiento date,
+    modalidad_amortizacion character varying(10) DEFAULT 'MENSUAL'::character varying,
+    CONSTRAINT intangible_modalidad_amortizacion_check CHECK (((modalidad_amortizacion)::text = ANY ((ARRAY['MENSUAL'::character varying, 'ANUAL'::character varying])::text[])))
+);
+
+
+ALTER TABLE public.intangible OWNER TO postgres;
+
+--
+-- TOC entry 218 (class 1259 OID 57667)
+-- Name: proveedor; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.proveedor (
+    idprovedor character varying(10) NOT NULL,
+    nombre_proveedor character varying(25) NOT NULL
+);
+
+
+ALTER TABLE public.proveedor OWNER TO postgres;
+
+--
+-- TOC entry 219 (class 1259 OID 57673)
+-- Name: reporte; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.reporte (
+    idreporte character varying(10) NOT NULL,
+    idintangible character varying(10) NOT NULL
+);
+
+
+ALTER TABLE public.reporte OWNER TO postgres;
+
+--
+-- TOC entry 220 (class 1259 OID 57680)
+-- Name: usuario; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.usuario (
+    idusuario character varying(10) NOT NULL,
+    contrasena character varying(8) NOT NULL,
+    nombre_completo character varying(100)
+);
+
+
+ALTER TABLE public.usuario OWNER TO postgres;
+
+--
+-- TOC entry 4758 (class 2604 OID 82840)
+-- Name: historial idhistorial; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.historial ALTER COLUMN idhistorial SET DEFAULT nextval('public.historial_idhistorial_seq'::regclass);
+
+
+--
+-- TOC entry 4932 (class 0 OID 57646)
+-- Dependencies: 215
+-- Data for Name: detalleamortizacion; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.detalleamortizacion (iddetalle, idintangible, numero_cuota, monto, amortizacion_mensual, amortizacion_anual, fecha_cuota) FROM stdin;
+DET0000002	508	1	3.47	3.47	41.67	2025-11-01
+e4ba4ed7c0	AV001	10	0.83	0.83	9.99	2025-04-01
+DET0000003	ACR01	1	10.00	10.00	120.00	2025-11-01
+DET0000004	AI001	1	21.67	21.67	260.00	2025-11-01
+b0feb3832f	AZR01	5	10.00	10.00	120.00	2025-07-01
+DET0000005	ANS01	1	125.00	125.00	1500.00	2025-11-01
+e4e3c95287	AZR01	9	10.00	10.00	120.00	2025-11-01
+32e1b8418f	AV001	3	0.83	0.83	9.99	2024-09-01
+DET0000006	AU001	1	35.00	35.00	420.00	2025-11-01
+DET0000007	AUT01	1	37.50	37.50	450.00	2025-11-01
+DET0000008	BLD01	1	29.17	29.17	350.00	2025-11-01
+b50354adfe	AV001	2	0.83	0.83	9.99	2024-08-01
+DET0000009	C3D01	1	10.00	10.00	120.00	2025-11-01
+DET0000010	ES001	1	2.92	2.92	35.00	2025-11-01
+e1432ae9a6	LR001	2	1.08	1.08	12.99	2025-03-10
+DET0000011	JB001	1	20.75	20.75	249.00	2025-11-01
+c4fc10c4d5	RV002	11	4.17	4.17	49.99	2025-07-01
+c08d982c66	LR001	3	1.08	1.08	12.99	2025-04-10
+DET0000012	JB002	1	16.58	16.58	199.00	2025-11-01
+DET0000013	JB005	1	12.42	12.42	149.00	2025-11-01
+DET0000014	JB006	1	14.08	14.08	169.00	2025-11-01
+5329d2fdc0	LR001	10	1.08	1.08	12.99	2025-11-10
+DET0000015	JB007	1	16.58	16.58	199.00	2025-11-01
+18d944387c	AU002	1	3.33	3.33	39.99	2025-02-01
+DET0000016	KS001	1	3.75	3.75	45.00	2025-11-01
+DET0000017	LIC169449	1	16.67	16.67	200.00	2025-11-01
+DET0000018	LIC238519	1	25.00	25.00	300.00	2025-11-01
+DET0000019	LIC343908	1	3.33	3.33	40.00	2025-11-01
+DET0000020	LIC518927	1	1.25	1.25	15.00	2025-11-01
+DET0000021	LIC584190	1	25.00	25.00	300.00	2025-11-01
+DET0000022	LIC672440	1	16.67	16.67	200.00	2025-11-01
+d92ab9caef	LR001	7	1.08	1.08	12.99	2025-08-10
+DET0000023	LIC978930	1	746.92	746.92	8963.00	2025-11-01
+DET0000024	MAT01	1	25.00	25.00	300.00	2025-11-01
+DET0000025	MC001	1	3.33	3.33	39.99	2025-11-01
+DET0000026	MY001	1	41.58	41.58	499.00	2025-11-01
+5f227587b0	PS001	8	1.92	1.92	22.99	2025-09-01
+DET0000027	NR001	1	3.33	3.33	40.00	2025-11-01
+DET0000028	OF001	1	12.50	12.50	150.00	2025-11-01
+DET0000029	OR001	1	75.00	75.00	900.00	2025-11-01
+DET0000030	PBI01	1	8.25	8.25	99.00	2025-11-01
+DET0000031	PR001	1	15.00	15.00	180.00	2025-11-01
+DET0000032	PS002	1	20.00	20.00	240.00	2025-11-01
+DET0000033	QKS01	1	66.67	66.67	800.00	2025-11-01
+054165fb0a	RV002	12	4.17	4.17	49.99	2025-08-01
+08d62c80f3	AV001	7	0.83	0.83	9.99	2025-01-01
+DET0000034	RV001	1	40.00	40.00	480.00	2025-11-01
+48897aa7b3	LIC093447	8	16.67	16.67	200.00	2026-05-05
+DET0000035	SAP01	1	166.67	166.67	2000.00	2025-11-01
+DET0000036	SW001	1	79.17	79.17	950.00	2025-11-01
+DET0000037	TOA01	1	60.00	60.00	720.00	2025-11-01
+DET0000038	VMW01	1	45.83	45.83	550.00	2025-11-01
+DET0000137	ACR01	5	10.00	10.00	120.00	2025-02-01
+28e2e20279	PR002	2	2.08	2.08	25.00	2024-09-01
+3a6d532530	PR002	3	2.08	2.08	25.00	2024-10-01
+0e99c286ce	PR002	10	2.08	2.08	25.00	2025-05-01
+5e6137a3bd	SAP02	1	15.00	15.00	180.00	2025-02-01
+DET0000040	508	2	3.47	3.47	41.67	2026-02-01
+DET0000041	ACR01	2	10.00	10.00	120.00	2026-02-01
+DET0000042	AI001	2	21.67	21.67	260.00	2026-02-01
+DET0000043	ANS01	2	125.00	125.00	1500.00	2026-02-01
+4d42653c47	RV002	4	4.17	4.17	49.99	2024-12-01
+bb6bf7d386	PR002	7	2.08	2.08	25.00	2025-02-01
+DET0000044	AU001	2	35.00	35.00	420.00	2026-02-01
+DET0000045	AUT01	2	37.50	37.50	450.00	2026-02-01
+DET0000046	BLD01	2	29.17	29.17	350.00	2026-02-01
+DET0000047	C3D01	2	10.00	10.00	120.00	2026-02-01
+DET0000048	ES001	2	2.92	2.92	35.00	2026-02-01
+DET0000049	JB001	2	20.75	20.75	249.00	2026-02-01
+DET0000050	JB002	2	16.58	16.58	199.00	2026-02-01
+DET0000051	JB005	2	12.42	12.42	149.00	2026-02-01
+DET0000052	JB006	2	14.08	14.08	169.00	2026-02-01
+DET0000053	JB007	2	16.58	16.58	199.00	2026-02-01
+DET0000054	KS001	2	3.75	3.75	45.00	2026-02-01
+DET0000055	LIC169449	2	16.67	16.67	200.00	2026-02-01
+DET0000056	LIC238519	2	25.00	25.00	300.00	2026-02-01
+DET0000057	LIC343908	2	3.33	3.33	40.00	2026-02-01
+DET0000058	LIC518927	2	1.25	1.25	15.00	2026-02-01
+DET0000059	LIC584190	2	25.00	25.00	300.00	2026-02-01
+DET0000060	LIC672440	2	16.67	16.67	200.00	2026-02-01
+DET0000061	LIC978930	2	746.92	746.92	8963.00	2026-02-01
+DET0000062	MAT01	2	25.00	25.00	300.00	2026-02-01
+DET0000063	MC001	2	3.33	3.33	39.99	2026-02-01
+DET0000064	MY001	2	41.58	41.58	499.00	2026-02-01
+DET0000065	NR001	2	3.33	3.33	40.00	2026-02-01
+DET0000066	OF001	2	12.50	12.50	150.00	2026-02-01
+DET0000067	OR001	2	75.00	75.00	900.00	2026-02-01
+DET0000068	PBI01	2	8.25	8.25	99.00	2026-02-01
+DET0000069	PR001	2	15.00	15.00	180.00	2026-02-01
+DET0000070	PS002	2	20.00	20.00	240.00	2026-02-01
+DET0000071	QKS01	2	66.67	66.67	800.00	2026-02-01
+DET0000072	RV001	2	40.00	40.00	480.00	2026-02-01
+DET0000073	SAP01	2	166.67	166.67	2000.00	2026-02-01
+DET0000074	SW001	2	79.17	79.17	950.00	2026-02-01
+DET0000075	TOA01	2	60.00	60.00	720.00	2026-02-01
+DET0000076	VMW01	2	45.83	45.83	550.00	2026-02-01
+d7fbcaf6b4	JB003	4	1.67	1.67	19.99	2025-05-01
+64108561df	SAP02	8	15.00	15.00	180.00	2025-09-01
+985d2d4e81	JB003	11	1.67	1.67	19.99	2025-12-01
+b61c81edd7	AU002	8	3.33	3.33	39.99	2025-09-01
+DET0000077	ACR01	3	10.00	10.00	120.00	2025-01-01
+DET0000078	AI001	3	21.67	21.67	260.00	2025-01-01
+DET0000079	AU001	3	35.00	35.00	420.00	2025-01-01
+DET0000080	AUT01	3	37.50	37.50	450.00	2025-01-01
+DET0000081	C3D01	3	10.00	10.00	120.00	2025-01-01
+DET0000082	ES001	3	2.92	2.92	35.00	2025-01-01
+DET0000083	JB001	3	20.75	20.75	249.00	2025-01-01
+a61bcf13b5	OF002	7	1.25	1.25	15.00	2025-08-01
+3447be8efb	XD001	7	1.25	1.25	15.00	2025-09-01
+DET0000084	JB002	3	16.58	16.58	199.00	2025-01-01
+DET0000085	JB005	3	12.42	12.42	149.00	2025-01-01
+DET0000086	JB007	3	16.58	16.58	199.00	2025-01-01
+041166f4c4	OF002	3	1.25	1.25	15.00	2025-04-01
+DET0000087	LIC169449	3	16.67	16.67	200.00	2025-01-01
+ec06748bdf	LIC093447	1	16.67	16.67	200.00	2025-10-05
+6937e69069	XD001	3	1.25	1.25	15.00	2025-05-01
+DET0000088	LIC343908	3	3.33	3.33	40.00	2025-01-01
+DET0000089	LIC672440	3	16.67	16.67	200.00	2025-01-01
+DET0000090	LIC978930	3	746.92	746.92	8963.00	2025-01-01
+DET0000091	MAT01	3	25.00	25.00	300.00	2025-01-01
+963bf4d6b9	OF002	10	1.25	1.25	15.00	2025-11-01
+DET0000092	MC001	3	3.33	3.33	39.99	2025-01-01
+DET0000093	MY001	3	41.58	41.58	499.00	2025-01-01
+3e5e0aeedf	XD001	10	1.25	1.25	15.00	2025-12-01
+060968d4ef	OF002	2	1.25	1.25	15.00	2025-03-01
+DET0000094	OF001	3	12.50	12.50	150.00	2025-01-01
+DET0000095	OR001	3	75.00	75.00	900.00	2025-01-01
+DET0000096	PBI01	3	8.25	8.25	99.00	2025-01-01
+87cf738756	XD001	2	1.25	1.25	15.00	2025-04-01
+DET0000097	PR001	3	15.00	15.00	180.00	2025-01-01
+DET0000098	PS002	3	20.00	20.00	240.00	2025-01-01
+DET0000099	RV001	3	40.00	40.00	480.00	2025-01-01
+DET0000100	SAP01	3	166.67	166.67	2000.00	2025-01-01
+b96ed7e5da	JB003	12	1.67	1.67	19.99	2026-01-01
+DET0000101	SW001	3	79.17	79.17	950.00	2025-01-01
+DET0000102	TOA01	3	60.00	60.00	720.00	2025-01-01
+584eefc0a0	PS001	1	1.92	1.92	22.99	2025-02-01
+01d9e61f60	AZR01	6	10.00	10.00	120.00	2025-08-01
+46aa466b0f	JB003	10	1.67	1.67	19.99	2025-11-01
+7a3d78d3cf	JB003	3	1.67	1.67	19.99	2025-04-01
+7546738275	OF002	12	1.25	1.25	15.00	2026-01-01
+19ffc23c45	XD001	12	1.25	1.25	15.00	2026-02-01
+19f3fe3eb6	JB003	2	1.67	1.67	19.99	2025-03-01
+d27cb4585f	SAP02	5	15.00	15.00	180.00	2025-06-01
+4aca9ac1b1	SAP02	9	15.00	15.00	180.00	2025-10-01
+bc6fff6ab9	JB003	7	1.67	1.67	19.99	2025-08-01
+DET0000103	ACR01	4	10.00	10.00	120.00	2025-03-01
+DET0000104	AI001	4	21.67	21.67	260.00	2025-03-01
+DET0000105	ANS01	3	125.00	125.00	1500.00	2025-03-01
+DET0000106	AU001	4	35.00	35.00	420.00	2025-03-01
+ae43dd61e1	OF002	11	1.25	1.25	15.00	2025-12-01
+1c57b64fc3	XD001	11	1.25	1.25	15.00	2026-01-01
+DET0000107	AUT01	4	37.50	37.50	450.00	2025-03-01
+DET0000108	BLD01	3	29.17	29.17	350.00	2025-03-01
+DET0000109	C3D01	4	10.00	10.00	120.00	2025-03-01
+DET0000110	ES001	4	2.92	2.92	35.00	2025-03-01
+DET0000111	JB001	4	20.75	20.75	249.00	2025-03-01
+DET0000112	JB002	4	16.58	16.58	199.00	2025-03-01
+DET0000113	JB005	4	12.42	12.42	149.00	2025-03-01
+DET0000114	JB006	3	14.08	14.08	169.00	2025-03-01
+DET0000115	JB007	4	16.58	16.58	199.00	2025-03-01
+DET0000116	KS001	3	3.75	3.75	45.00	2025-03-01
+DET0000117	LIC169449	4	16.67	16.67	200.00	2025-03-01
+DET0000118	LIC343908	4	3.33	3.33	40.00	2025-03-01
+DET0000119	LIC672440	4	16.67	16.67	200.00	2025-03-01
+cf8c2412c1	LIC093447	6	16.67	16.67	200.00	2026-03-05
+DET0000120	LIC978930	4	746.92	746.92	8963.00	2025-03-01
+DET0000121	MAT01	4	25.00	25.00	300.00	2025-03-01
+DET0000122	MC001	4	3.33	3.33	39.99	2025-03-01
+6f9b409c24	AU002	9	3.33	3.33	39.99	2025-10-01
+DET0000123	MY001	4	41.58	41.58	499.00	2025-03-01
+DET0000124	NR001	3	3.33	3.33	40.00	2025-03-01
+DET0000125	OF001	4	12.50	12.50	150.00	2025-03-01
+DET0000126	OR001	4	75.00	75.00	900.00	2025-03-01
+DET0000127	PBI01	4	8.25	8.25	99.00	2025-03-01
+9768a836ba	AU002	5	3.33	3.33	39.99	2025-06-01
+DET0000128	PR001	4	15.00	15.00	180.00	2025-03-01
+DET0000129	PS002	4	20.00	20.00	240.00	2025-03-01
+708d0eaf35	PS001	6	1.92	1.92	22.99	2025-07-01
+10b84e700d	AZR01	1	10.00	10.00	120.00	2025-03-01
+DET0000130	QKS01	3	66.67	66.67	800.00	2025-03-01
+dad3967e29	OF002	4	1.25	1.25	15.00	2025-05-01
+DET0000131	RV001	4	40.00	40.00	480.00	2025-03-01
+733d853b21	XD001	4	1.25	1.25	15.00	2025-06-01
+DET0000132	SAP01	4	166.67	166.67	2000.00	2025-03-01
+DET0000133	SW001	4	79.17	79.17	950.00	2025-03-01
+DET0000134	TOA01	4	60.00	60.00	720.00	2025-03-01
+DET0000135	VMW01	3	45.83	45.83	550.00	2025-03-01
+cd68fa1183	AZR01	8	10.00	10.00	120.00	2025-10-01
+2c999b0c8a	PR002	11	2.08	2.08	25.00	2025-06-01
+DET0000136	505	1	3.47	3.47	41.67	2025-11-01
+6a3bbd76e8	PS001	9	1.92	1.92	22.99	2025-10-01
+92d2f90783	PS001	5	1.92	1.92	22.99	2025-06-01
+3e275ef359	LR001	4	1.08	1.08	12.99	2025-05-10
+ebb83e92d6	PR002	12	2.08	2.08	25.00	2025-07-01
+2e9a7f507e	AV001	4	0.83	0.83	9.99	2024-10-01
+1655dcc8cc	LIC093447	5	16.67	16.67	200.00	2026-02-05
+5d539e6362	LIC093447	9	16.67	16.67	200.00	2026-06-05
+97c7428e2f	AU002	6	3.33	3.33	39.99	2025-07-01
+4501308e66	RV002	3	4.17	4.17	49.99	2024-11-01
+97aa609fcc	RV002	10	4.17	4.17	49.99	2025-06-01
+ca0146495c	RV002	2	4.17	4.17	49.99	2024-10-01
+49794ca169	LR001	11	1.08	1.08	12.99	2025-12-10
+df21b52515	AV001	11	0.83	0.83	9.99	2025-05-01
+c6dd66d80e	SAP02	6	15.00	15.00	180.00	2025-07-01
+f546666cad	LR001	12	1.08	1.08	12.99	2026-01-10
+fd4b791f30	RV002	7	4.17	4.17	49.99	2025-03-01
+e6c04f21e1	PR002	4	2.08	2.08	25.00	2024-11-01
+487ced3660	AV001	12	0.83	0.83	9.99	2025-06-01
+7a44cd6afa	SAP02	12	15.00	15.00	180.00	2026-01-01
+15e05660f2	SAP02	11	15.00	15.00	180.00	2025-12-01
+3f5745c9dc	AV001	6	0.83	0.83	9.99	2024-12-01
+a6829d9798	AU002	4	3.33	3.33	39.99	2025-05-01
+4f7b52506e	XD001	9	1.25	1.25	15.00	2025-11-01
+99301e11d2	OF002	9	1.25	1.25	15.00	2025-10-01
+94044d6436	XD001	5	1.25	1.25	15.00	2025-07-01
+5cbc5e34c2	OF002	5	1.25	1.25	15.00	2025-06-01
+7bad4dc672	LR001	6	1.08	1.08	12.99	2025-07-10
+59ba70929f	SAP02	4	15.00	15.00	180.00	2025-05-01
+fd45325c4e	RV002	1	4.17	4.17	49.99	2024-09-01
+3ea4501f4e	JB003	8	1.67	1.67	19.99	2025-09-01
+1f163e9fde	AU002	11	3.33	3.33	39.99	2025-12-01
+25fd48c7e5	AU002	12	3.33	3.33	39.99	2026-01-01
+9c2ae256eb	PR002	6	2.08	2.08	25.00	2025-01-01
+607908f00c	PS001	12	1.92	1.92	22.99	2026-01-01
+b554059135	JB003	1	1.67	1.67	19.99	2025-02-01
+e2c51801d7	PR002	9	2.08	2.08	25.00	2025-04-01
+417019416d	PR002	5	2.08	2.08	25.00	2024-12-01
+aa801af232	RV002	8	4.17	4.17	49.99	2025-04-01
+b552033fcf	LIC093447	12	16.67	16.67	200.00	2026-09-05
+8aa4f7401a	PS001	11	1.92	1.92	22.99	2025-12-01
+df7b80c826	LIC093447	11	16.67	16.67	200.00	2026-08-05
+8f0de960f1	OF002	6	1.25	1.25	15.00	2025-07-01
+119a982337	XD001	6	1.25	1.25	15.00	2025-08-01
+23fbddf485	PS001	4	1.92	1.92	22.99	2025-05-01
+45c68d4c31	LR001	9	1.08	1.08	12.99	2025-10-10
+d5dcc79be9	LR001	5	1.08	1.08	12.99	2025-06-10
+05221fb6bc	AV001	5	0.83	0.83	9.99	2024-11-01
+72d7376336	LIC093447	4	16.67	16.67	200.00	2026-01-05
+339f17112b	AZR01	10	10.00	10.00	120.00	2025-12-01
+9e2d66c0f3	AZR01	3	10.00	10.00	120.00	2025-05-01
+dc50622651	AV001	9	0.83	0.83	9.99	2025-03-01
+710d96fa91	AZR01	2	10.00	10.00	120.00	2025-04-01
+d3c91e7bed	AZR01	7	10.00	10.00	120.00	2025-09-01
+4d4fba8be2	AZR01	11	10.00	10.00	120.00	2026-01-01
+f0c1640eb9	RV002	9	4.17	4.17	49.99	2025-05-01
+3f0e4fc557	PR002	8	2.08	2.08	25.00	2025-03-01
+5dd2ff8245	RV002	5	4.17	4.17	49.99	2025-01-01
+14ab1560f7	AZR01	12	10.00	10.00	120.00	2026-02-01
+122abf2e9d	JB003	6	1.67	1.67	19.99	2025-07-01
+87e81ec382	LR001	8	1.08	1.08	12.99	2025-09-10
+d76bbb48aa	PS001	7	1.92	1.92	22.99	2025-08-01
+c56b4ed333	AV001	8	0.83	0.83	9.99	2025-02-01
+5fdae4c808	LIC093447	7	16.67	16.67	200.00	2026-04-05
+7afdbd5835	LIC093447	10	16.67	16.67	200.00	2026-07-05
+7eb9a4a282	AZR01	4	10.00	10.00	120.00	2025-06-01
+e31dfd1701	OF002	1	1.25	1.25	15.00	2025-02-01
+5925a77982	LIC093447	3	16.67	16.67	200.00	2025-12-05
+a80ac95684	XD001	1	1.25	1.25	15.00	2025-03-01
+833d0cfaf6	LIC093447	2	16.67	16.67	200.00	2025-11-05
+4bf1a58a9a	PS001	3	1.92	1.92	22.99	2025-04-01
+be6eb5bc3e	PS001	10	1.92	1.92	22.99	2025-11-01
+1749c0d333	PS001	2	1.92	1.92	22.99	2025-03-01
+e5767a965f	AV001	1	0.83	0.83	9.99	2024-07-01
+e630e1eb36	AU002	2	3.33	3.33	39.99	2025-03-01
+a78807f8c8	AU002	3	3.33	3.33	39.99	2025-04-01
+86b6918155	LR001	1	1.08	1.08	12.99	2025-02-10
+52b77862e7	AU002	10	3.33	3.33	39.99	2025-11-01
+ab415e52e8	AU002	7	3.33	3.33	39.99	2025-08-01
+88d8557551	XD001	8	1.25	1.25	15.00	2025-10-01
+6f80d72be3	OF002	8	1.25	1.25	15.00	2025-09-01
+d3fbf20777	JB003	5	1.67	1.67	19.99	2025-06-01
+88138e2235	JB003	9	1.67	1.67	19.99	2025-10-01
+8b2abd9bc5	SAP02	7	15.00	15.00	180.00	2025-08-01
+77da68baea	PR002	1	2.08	2.08	25.00	2024-08-01
+533ecbb063	RV002	6	4.17	4.17	49.99	2025-02-01
+a64de7bad8	SAP02	10	15.00	15.00	180.00	2025-11-01
+be8173fe95	SAP02	3	15.00	15.00	180.00	2025-04-01
+c678037461	SAP02	2	15.00	15.00	180.00	2025-03-01
+\.
+
+
+--
+-- TOC entry 4933 (class 0 OID 57653)
+-- Dependencies: 216
+-- Data for Name: historial; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.historial (idhistorial) FROM stdin;
+\.
+
+
+--
+-- TOC entry 4934 (class 0 OID 57660)
+-- Dependencies: 217
+-- Data for Name: intangible; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.intangible (idintangible, version, nombre_proveedor, tipo_licencia_, codigo_, costo, vida_util, estado_, nombre_intangible, fecha_adquisicion, fecha_vencimiento, modalidad_amortizacion) FROM stdin;
+LIC584190	2024	ADOBE ENTERPRISE	Anual	COD-1759711584190	300.00	6 meses	ACTIVO	Adobe	2025-10-09	2026-04-09	MENSUAL
+LIC169449	2025	ADOBE	Anual	COD-1759718169450	200.00	5 meses	ACTIVO	ADOBE	2022-10-05	2023-03-05	MENSUAL
+LIC518927	2025	Microsoft	Mensual	COD-1761766518927	15.00	5 meses	ACTIVO	Avast	2025-05-04	2026-05-04	MENSUAL
+C3D01	8494	AUTODESK	Anual	C3D-2024-LIC-006	600.00	5 años	ACTIVO	AutoCAD Civil 3D	2024-04-01	2029-04-01	ANUAL
+LIC672440	2025	El Salvador	Mensual	COD-1762289672441	200.00	5 meses	ACTIVO	UES2025	2020-12-04	2021-05-04	MENSUAL
+508	2025	UES	Anual	59643	500.00	12	ACTIVO	Monica	2025-11-19	2026-11-19	ANUAL
+AU002	2025	Autodesk	Mensual	ACAD-2025-ACT-002	39.99	1 mes	ACTIVO	AutoCAD LT	2025-02-01	2025-03-01	MENSUAL
+RV002	2024	Autodesk	Mensual	REVIT-2024-LIC-005	49.99	1 mes	ACTIVO	Revit LT	2024-09-01	2024-10-01	MENSUAL
+OF002	2025	Microsoft	Mensual	O365-PRO-KEY-009	15.00	1 mes	ACTIVO	Microsoft 365 Personal	2025-02-01	2025-03-01	MENSUAL
+AZR01	2025	Microsoft	Mensual	AZR-CLOUD-KEY-013	120.00	1 mes	ACTIVO	Microsoft Azure Cloud	2025-03-01	2025-04-01	MENSUAL
+PS001	2025	Adobe	Mensual	PS-CC-KEY-015	22.99	1 mes	ACTIVO	Adobe Photoshop CC	2025-02-01	2025-03-01	MENSUAL
+PR002	2024	Adobe	Mensual	PR-CC-KEY-017	25.00	1 mes	ACTIVO	Adobe Premiere Pro	2024-08-01	2024-09-01	MENSUAL
+LR001	2025	Adobe	Mensual	LR-CC-KEY-019	12.99	1 mes	ACTIVO	Adobe Lightroom CC	2025-02-10	2025-03-10	MENSUAL
+XD001	2025	Adobe	Mensual	XD-CC-KEY-021	15.00	1 mes	ACTIVO	Adobe XD	2025-03-01	2025-04-01	MENSUAL
+JB003	2025	JetBrains	Mensual	WS-PRO-KEY-025	19.99	1 mes	ACTIVO	WebStorm Professional	2025-02-01	2025-03-01	MENSUAL
+AV001	2024	Avast	Mensual	AVST-BUS-KEY-033	9.99	1 mes	ACTIVO	Avast Business Premium	2024-07-01	2024-08-01	MENSUAL
+SAP02	2025	SAP	Mensual	SAP-CLOUD-KEY-040	180.00	1 mes	ACTIVO	SAP Cloud Platform	2025-02-01	2025-03-01	MENSUAL
+LIC093447	2020	Oracle	Mensual	COD-1759677093462	200.00	12 meses	ACTIVO	Oracle Cloud	2025-10-05	2026-10-05	MENSUAL
+AU001	2024	Autodesk	Anual	ACAD-2024-ACT-001	420.00	12 meses	ACTIVO	AutoCAD LT	2024-03-01	2025-03-01	ANUAL
+RV001	2025	Autodesk	Anual	REVIT-2025-LIC-004	480.00	12 meses	ACTIVO	Revit 2025	2025-01-10	2026-01-10	ANUAL
+OF001	2025	Microsoft	Anual	O365-STD-KEY-008	150.00	12 meses	ACTIVO	Microsoft 365 Business Standard	2025-01-15	2026-01-15	ANUAL
+PR001	2024	Microsoft	Anual	PROJ-STD-KEY-010	180.00	12 meses	ACTIVO	Microsoft Project	2024-05-05	2025-05-05	ANUAL
+PBI01	2024	Microsoft	Anual	PBI-ENT-KEY-014	99.00	12 meses	ACTIVO	Power BI Pro	2024-06-10	2025-06-10	ANUAL
+PS002	2025	Adobe	Anual	PS-CC-KEY-016	240.00	12 meses	ACTIVO	Adobe Photoshop CC	2025-01-01	2026-01-01	ANUAL
+AI001	2024	Adobe	Anual	AI-CC-KEY-018	260.00	12 meses	ACTIVO	Adobe Illustrator CC	2024-02-01	2025-02-01	ANUAL
+ACR01	2025	Adobe	Anual	ACR-PRO-KEY-022	120.00	12 meses	ACTIVO	Adobe Acrobat Pro DC	2025-01-01	2026-01-01	ANUAL
+JB001	2025	JetBrains	Anual	INTJ-U-KEY-023	249.00	12 meses	ACTIVO	IntelliJ IDEA Ultimate	2025-01-01	2026-01-01	ANUAL
+JB002	2024	JetBrains	Anual	PYCH-PRO-KEY-024	199.00	12 meses	ACTIVO	PyCharm Professional	2024-04-01	2025-04-01	ANUAL
+JB005	2023	JetBrains	Anual	RIDR-PRO-KEY-027	149.00	12 meses	ACTIVO	Rider Professional	2023-07-15	2024-07-15	ANUAL
+JB006	2025	JetBrains	Anual	PHP-PRO-KEY-028	169.00	12 meses	ACTIVO	PhpStorm Professional	2025-03-01	2026-03-01	ANUAL
+JB007	2024	JetBrains	Anual	CLN-PRO-KEY-029	199.00	12 meses	ACTIVO	CLion Professional	2024-06-01	2025-06-01	ANUAL
+ES001	2025	ESET	Anual	ESET-ENDP-KEY-030	35.00	12 meses	ACTIVO	ESET Endpoint Security	2025-01-01	2026-01-01	ANUAL
+KS001	2025	Kaspersky	Anual	KASP-SEC-KEY-031	45.00	12 meses	ACTIVO	Kaspersky Small Office	2025-02-01	2026-02-01	ANUAL
+NR001	2025	Norton	Anual	NORT-DELX-KEY-032	40.00	12 meses	ACTIVO	Norton 360 Deluxe	2025-03-01	2026-03-01	ANUAL
+MC001	2024	McAfee	Anual	MCF-TOT-KEY-034	39.99	12 meses	ACTIVO	McAfee Total Protection	2024-01-01	2025-01-01	ANUAL
+OR001	2024	Oracle	Anual	ORA-DB-KEY-035	900.00	12 meses	ACTIVO	Oracle Database Standard	2024-04-01	2025-04-01	ANUAL
+MY001	2024	MySQL AB	Anual	MYSQL-ENT-KEY-038	499.00	12 meses	ACTIVO	MySQL Enterprise	2024-02-01	2025-02-01	ANUAL
+SAP01	2025	SAP	Anual	SAP-ERP-KEY-039	2000.00	12 meses	ACTIVO	SAP Business One	2025-01-01	2026-01-01	ANUAL
+SW001	2025	Dassault Systèmes	Anual	SW-STD-KEY-041	950.00	12 meses	ACTIVO	SolidWorks Standard	2025-01-10	2026-01-10	ANUAL
+MAT01	2025	MathWorks	Anual	MATLAB-KEY-043	300.00	12 meses	ACTIVO	MATLAB Academic License	2025-01-01	2026-01-01	ANUAL
+ANS01	2025	ANSYS Inc.	Anual	ANS-KEY-044	1500.00	12 meses	ACTIVO	ANSYS Mechanical	2025-02-01	2026-02-01	ANUAL
+VMW01	2025	VMware	Anual	VMW-PRO-KEY-045	550.00	12 meses	ACTIVO	VMware Workstation Pro	2025-03-01	2026-03-01	ANUAL
+TOA01	2025	Tableau Software	Anual	TBL-KEY-047	720.00	12 meses	ACTIVO	Tableau Desktop	2025-01-01	2026-01-01	ANUAL
+QKS01	2025	Qlik	Anual	QLK-SENSE-KEY-048	800.00	12 meses	ACTIVO	Qlik Sense Business	2025-02-01	2026-02-01	ANUAL
+AUT01	2025	Autodesk	Anual	AUT-ALIAS-KEY-049	450.00	12 meses	ACTIVO	Autodesk Alias	2025-01-01	2026-01-01	ANUAL
+BLD01	2025	Autodesk	Anual	AUT-BLD-KEY-050	350.00	12 meses	ACTIVO	Autodesk Build	2025-03-01	2026-03-01	ANUAL
+LIC238519	2025	Microsoft	Anual	COD-1759718238519	300.00	5 meses	ACTIVO	Adobe	2025-10-05	2026-03-05	MENSUAL
+LIC343908	2025	AUTOCADLK	Anual	COD-1761768343909	200.00	5 años	ACTIVO	AUTODESK	2024-12-05	2029-12-05	MENSUAL
+LIC978930	569	UES	Mensual	COD-1762298978930	8963.00	5 meses	ACTIVO	MONICA	2020-09-05	2021-02-05	MENSUAL
+505	2025	UES	Anual	59643	500.00	12	ACTIVO	Monica	2025-11-19	2026-11-19	ANUAL
+\.
+
+
+--
+-- TOC entry 4935 (class 0 OID 57667)
+-- Dependencies: 218
+-- Data for Name: proveedor; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.proveedor (idprovedor, nombre_proveedor) FROM stdin;
+PRV001	Autodesk
+PRV002	Microsoft
+PRV003	Adobe
+PRV004	JetBrains
+PRV005	ESET
+PRV006	Kaspersky
+PRV007	Norton
+PRV008	Avast
+PRV009	McAfee
+PRV010	Oracle
+PRV011	PostgreSQL Global
+PRV012	MySQL AB
+PRV013	SAP
+PRV014	Dassault Systèmes
+PRV015	MathWorks
+PRV016	ANSYS Inc.
+PRV017	VMware
+PRV018	Tableau Software
+PRV019	Qlik
+\.
+
+
+--
+-- TOC entry 4936 (class 0 OID 57673)
+-- Dependencies: 219
+-- Data for Name: reporte; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.reporte (idreporte, idintangible) FROM stdin;
+\.
+
+
+--
+-- TOC entry 4937 (class 0 OID 57680)
+-- Dependencies: 220
+-- Data for Name: usuario; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.usuario (idusuario, contrasena, nombre_completo) FROM stdin;
+FM22016	proyecto	Monica Mendoza
+BETHO	123	Bethoven
+USER1	123	Antonio Caceres
+\.
+
+
+--
+-- TOC entry 4945 (class 0 OID 0)
+-- Dependencies: 221
+-- Name: historial_idhistorial_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.historial_idhistorial_seq', 1, false);
+
+
+--
+-- TOC entry 4771 (class 2606 OID 82842)
+-- Name: historial historial_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.historial
+    ADD CONSTRAINT historial_pkey PRIMARY KEY (idhistorial);
+
+
+--
+-- TOC entry 4765 (class 2606 OID 57650)
+-- Name: detalleamortizacion pk_detalleamortizacion; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.detalleamortizacion
+    ADD CONSTRAINT pk_detalleamortizacion PRIMARY KEY (iddetalle);
+
+
+--
+-- TOC entry 4774 (class 2606 OID 57664)
+-- Name: intangible pk_intangible; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.intangible
+    ADD CONSTRAINT pk_intangible PRIMARY KEY (idintangible);
+
+
+--
+-- TOC entry 4776 (class 2606 OID 57671)
+-- Name: proveedor pk_proveedor; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.proveedor
+    ADD CONSTRAINT pk_proveedor PRIMARY KEY (idprovedor);
+
+
+--
+-- TOC entry 4780 (class 2606 OID 57677)
+-- Name: reporte pk_reporte; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.reporte
+    ADD CONSTRAINT pk_reporte PRIMARY KEY (idreporte);
+
+
+--
+-- TOC entry 4783 (class 2606 OID 57684)
+-- Name: usuario pk_usuario; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.usuario
+    ADD CONSTRAINT pk_usuario PRIMARY KEY (idusuario);
+
+
+--
+-- TOC entry 4768 (class 2606 OID 57750)
+-- Name: detalleamortizacion uq_detalle; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.detalleamortizacion
+    ADD CONSTRAINT uq_detalle UNIQUE (idintangible, numero_cuota);
+
+
+--
+-- TOC entry 4761 (class 1259 OID 57651)
+-- Name: detalleamortizacion_pk; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX detalleamortizacion_pk ON public.detalleamortizacion USING btree (iddetalle);
+
+
+--
+-- TOC entry 4778 (class 1259 OID 57679)
+-- Name: genera_fk; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX genera_fk ON public.reporte USING btree (idintangible);
+
+
+--
+-- TOC entry 4769 (class 1259 OID 57658)
+-- Name: historial_pk; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX historial_pk ON public.historial USING btree (idhistorial);
+
+
+--
+-- TOC entry 4762 (class 1259 OID 57740)
+-- Name: idx_detalle_fecha; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_detalle_fecha ON public.detalleamortizacion USING btree (fecha_cuota);
+
+
+--
+-- TOC entry 4763 (class 1259 OID 57741)
+-- Name: idx_detalle_idint; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_detalle_idint ON public.detalleamortizacion USING btree (idintangible);
+
+
+--
+-- TOC entry 4772 (class 1259 OID 57665)
+-- Name: intangible_pk; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX intangible_pk ON public.intangible USING btree (idintangible);
+
+
+--
+-- TOC entry 4777 (class 1259 OID 57672)
+-- Name: proveedor_pk; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX proveedor_pk ON public.proveedor USING btree (idprovedor);
+
+
+--
+-- TOC entry 4781 (class 1259 OID 57678)
+-- Name: reporte_pk; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX reporte_pk ON public.reporte USING btree (idreporte);
+
+
+--
+-- TOC entry 4766 (class 1259 OID 57652)
+-- Name: se_compone_en_fk; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX se_compone_en_fk ON public.detalleamortizacion USING btree (idintangible);
+
+
+--
+-- TOC entry 4784 (class 1259 OID 57685)
+-- Name: usuario_pk; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX usuario_pk ON public.usuario USING btree (idusuario);
+
+
+--
+-- TOC entry 4787 (class 2620 OID 57754)
+-- Name: detalleamortizacion trg_detalle_autocompletar; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_detalle_autocompletar BEFORE INSERT OR UPDATE ON public.detalleamortizacion FOR EACH ROW EXECUTE FUNCTION public.fn_detalle_autocompletar();
+
+
+--
+-- TOC entry 4788 (class 2620 OID 57743)
+-- Name: detalleamortizacion trg_set_fecha_cuota; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_set_fecha_cuota BEFORE INSERT OR UPDATE ON public.detalleamortizacion FOR EACH ROW EXECUTE FUNCTION public.fn_set_fecha_cuota();
+
+
+--
+-- TOC entry 4785 (class 2606 OID 57755)
+-- Name: detalleamortizacion fk_detalle_intangible; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.detalleamortizacion
+    ADD CONSTRAINT fk_detalle_intangible FOREIGN KEY (idintangible) REFERENCES public.intangible(idintangible) ON DELETE CASCADE;
+
+
+--
+-- TOC entry 4786 (class 2606 OID 57711)
+-- Name: reporte fk_reporte_genera_intangib; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.reporte
+    ADD CONSTRAINT fk_reporte_genera_intangib FOREIGN KEY (idintangible) REFERENCES public.intangible(idintangible) ON UPDATE RESTRICT ON DELETE RESTRICT;
+
+
+-- Completed on 2025-11-22 08:02:32
+
+--
+-- PostgreSQL database dump complete
+--
+
